@@ -14,8 +14,8 @@ clean:
 
 # Use `exec` so the shell running this recipe is replaced by the server process.
 # This prevents `make` from printing "Interrupt" when we stop the server with Ctrl-C.
-run-proxy:
-	cd ethproxy && exec cargo run
+run-proxy: ethproxy
+	exec sudo ./ethproxy/target/debug/ethproxy
 
-run-server:
-	cd frameforge && exec dune exec frameforge
+run-server: frameforge
+	exec ./frameforge/_build/default/bin/main.exe
