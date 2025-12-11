@@ -1,5 +1,6 @@
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::os::fd::AsFd;
+use std::os::unix::net::UnixStream;
 use std::sync::{Arc, atomic};
 
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
@@ -9,6 +10,8 @@ use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 //static VETHIP: &str = "192.168.35.1/24";
 
 fn main() {
+    // Check https://doc.rust-lang.org/stable/std/os/unix/net/struct.UnixStream.html#method.pair
+    //
     //let veth = setup::Veth::init(VETHNAME, VETHIP);
     //veth.create_device();
     //veth.destroy_device();
@@ -29,6 +32,15 @@ fn main() {
     // We declare the fd here to live during the whole loop
     let binding = io::stdin();
     let stdin_fd = binding.as_fd();
+
+    // Connect to server so we will be able to send data
+    let mut frameforge_sock = match UnixStream::connect("/tmp/frameforge.sock") {
+        Ok(sock) => sock,
+        Err(e) => {
+            println!("Couldn't connect to server: {e:.}");
+            return;
+        }
+    };
 
     println!("Ctrl-C to quit");
 
@@ -68,7 +80,26 @@ fn main() {
                 .read_line(&mut input)
                 .expect("Failed to read line");
 
-            print!("your input is {input}");
+            print!("Sending {input}");
+
+            // Sending to server. The protocol is to send the data size then the data
+            let data = input.as_bytes();
+            let data_len = data.len() as u32;
+
+            frameforge_sock.write_all(&data_len.to_le_bytes()).unwrap();
+            frameforge_sock.write_all(data).unwrap();
+            frameforge_sock.flush().unwrap();
+
+            // Read the 4 bytes lenght header
+            let mut len_buf = [0u8; 4];
+            frameforge_sock.read_exact(&mut len_buf).unwrap();
+            let len = u32::from_le_bytes(len_buf) as usize;
+
+            // Read the message
+            let mut buf = vec![0u8; len];
+            frameforge_sock.read_exact(&mut buf).unwrap();
+            print!("Received: {}", String::from_utf8(buf).unwrap());
+
             print!("> ");
             io::stdout().flush().unwrap();
         }
