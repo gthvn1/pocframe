@@ -1,15 +1,18 @@
+use std::error::Error;
 use std::io::{self, Read, Write};
 use std::os::fd::AsFd;
 use std::os::unix::net::UnixStream;
 use std::sync::{Arc, atomic};
 
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
+
 //use ethproxy::setup;
 
 //static VETHNAME: &str = "veth0";
 //static VETHIP: &str = "192.168.35.1/24";
+static SERVERPATH: &str = "/tmp/frameforge.sock";
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // Check https://doc.rust-lang.org/stable/std/os/unix/net/struct.UnixStream.html#method.pair
     //
     //let veth = setup::Veth::init(VETHNAME, VETHIP);
@@ -34,13 +37,7 @@ fn main() {
     let stdin_fd = binding.as_fd();
 
     // Connect to server so we will be able to send data
-    let mut frameforge_sock = match UnixStream::connect("/tmp/frameforge.sock") {
-        Ok(sock) => sock,
-        Err(e) => {
-            println!("Couldn't connect to server: {e:.}");
-            return;
-        }
-    };
+    let mut frameforge_sock = UnixStream::connect(SERVERPATH)?;
 
     println!("Ctrl-C to quit");
 
@@ -106,4 +103,5 @@ fn main() {
     }
 
     println!("Bye!!!");
+    Ok(())
 }
