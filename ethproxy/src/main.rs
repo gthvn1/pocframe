@@ -79,23 +79,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             print!("Sending {input}");
 
-            // Sending to server. The protocol is to send the data size then the data
-            let data = input.as_bytes();
-            let data_len = data.len() as u32;
-
-            frameforge_sock.write_all(&data_len.to_le_bytes()).unwrap();
-            frameforge_sock.write_all(data).unwrap();
-            frameforge_sock.flush().unwrap();
-
-            // Read the 4 bytes lenght header
-            let mut len_buf = [0u8; 4];
-            frameforge_sock.read_exact(&mut len_buf).unwrap();
-            let len = u32::from_le_bytes(len_buf) as usize;
-
-            // Read the message
-            let mut buf = vec![0u8; len];
-            frameforge_sock.read_exact(&mut buf).unwrap();
-            print!("Received: {}", String::from_utf8(buf).unwrap());
+            let response = send_message(&mut frameforge_sock, &input)?;
+            print!("Received: {response}");
 
             print!("> ");
             io::stdout().flush().unwrap();
@@ -104,4 +89,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Bye!!!");
     Ok(())
+}
+
+fn send_message(sock: &mut UnixStream, msg: &str) -> io::Result<String> {
+    // Sending to server. The protocol is to send the data size then the data
+    let data = msg.as_bytes();
+    let data_len = data.len() as u32;
+
+    sock.write_all(&data_len.to_le_bytes())?;
+    sock.write_all(data)?;
+    sock.flush()?;
+
+    // Read the 4 bytes lenght header
+    let mut len_buf = [0u8; 4];
+    sock.read_exact(&mut len_buf)?;
+    let len = u32::from_le_bytes(len_buf) as usize;
+
+    // Read the message
+    let mut buf = vec![0u8; len];
+    sock.read_exact(&mut buf)?;
+    Ok(String::from_utf8(buf).unwrap_or_default())
 }
