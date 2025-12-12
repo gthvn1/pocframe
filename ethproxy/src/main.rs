@@ -6,10 +6,11 @@ use std::sync::{Arc, atomic};
 
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
-//use ethproxy::setup;
+use ethproxy::setup;
 
-//static VETHNAME: &str = "veth0";
-//static VETHIP: &str = "192.168.35.1/24";
+// TODO: pass this as parameters of client binary
+const VETH_NAME: &str = "veth0";
+const VETH_IP: &str = "192.168.35.1/24";
 const SERVER_PATH: &str = "/tmp/frameforge.sock";
 
 enum PollAction {
@@ -20,11 +21,7 @@ enum PollAction {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Check https://doc.rust-lang.org/stable/std/os/unix/net/struct.UnixStream.html#method.pair
-    //
-    //let veth = setup::Veth::init(VETHNAME, VETHIP);
-    //veth.create_device();
-    //veth.destroy_device();
+    // ----- Prepare the loop: we want to allow quitting loop using Ctrl-C
     let keep_looping = Arc::new(atomic::AtomicBool::new(true));
 
     // Set handler to set keep looping to false. We need to clone
@@ -39,6 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Error setting Ctrl-C handler");
     }
 
+    // ----- Prepare the low level network: creation of Veth
+    let veth = setup::Veth::init(VETH_NAME, VETH_IP);
+    veth.create_device();
+
+    // ----- Setup file description for stdin: used by poll
     // We declare the fd here to live during the whole loop. It is a little
     // bit strange but I need to first declare the binding (io::stding() returns
     // a temporary), and then borrow it to stdin_fd. Then binding is dropped but
@@ -47,11 +49,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let binding = io::stdin();
     let stdin_fd = binding.as_fd();
 
-    // Connect to server so we will be able to send data
+    // ----- Connect to server: that will handle ethernet frame
     let mut frameforge_sock = UnixStream::connect(SERVER_PATH)?;
 
+    // ----- Ready to enter infinite client loop
     println!("Ctrl-C to quit");
-
     print!("> ");
     io::stdout().flush()?;
 
@@ -86,6 +88,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // ----- cleanup and quit
+    veth.destroy_device();
     println!("Bye!!!");
     Ok(())
 }
