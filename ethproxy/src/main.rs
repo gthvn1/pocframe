@@ -6,6 +6,9 @@ use std::sync::{Arc, atomic};
 
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
+use nix::sys::socket;
+use nix::sys::socket::MsgFlags;
+
 use ethproxy::setup::Veth;
 
 // TODO: pass this as parameters of client binary
@@ -37,12 +40,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Error setting Ctrl-C handler");
     }
 
-    // ----- Prepare the low level network: creation of Veth
-    let veth = Veth::init(VETH_NAME, VETH_IP);
-    veth.create_device();
-
-    let _veth_fd = open_veth_peer_socket(&veth)?;
-
     // ----- Setup file description for stdin: used by poll
     // We declare the fd here to live during the whole loop. It is a little
     // bit strange but I need to first declare the binding (io::stding() returns
@@ -51,6 +48,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // have an issue "temporary value dropped while borrowed".
     let binding = io::stdin();
     let stdin_fd = binding.as_fd();
+
+    // ----- Prepare the low level network: creation of Veth
+    let veth = Veth::init(VETH_NAME, VETH_IP);
+    veth.create_device();
+
+    let veth_fd = open_veth_peer_socket(&veth)?;
 
     // ----- Connect to server: that will handle ethernet frame
     let mut frameforge_sock = UnixStream::connect(SERVER_PATH)?;
@@ -64,13 +67,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Currently we just have stdin but we will add the Veth socket
         // In the implementation of poll_once we are expecting stdin in
         // first place (and next Veth that is not yet available).
-        let mut pollfds = [PollFd::new(stdin_fd, PollFlags::POLLIN)];
+        let mut pollfds = [
+            PollFd::new(stdin_fd, PollFlags::POLLIN),
+            PollFd::new(veth_fd.as_fd(), PollFlags::POLLIN),
+        ];
 
         match poll_once(&mut pollfds) {
             PollAction::Ignore | PollAction::TimedOut => continue,
             PollAction::VethReady => {
-                veth.destroy_device();
-                panic!("todo: send frame to server");
+                let mut buf = vec![0u8; 2048]; // enough room for ethernet frame
+                let n = socket::recv(veth_fd.as_raw_fd(), &mut buf, MsgFlags::empty())?;
+
+                let response = send_data(&mut frameforge_sock, &buf[0..n])?;
+                print!("Received: {response}");
+
+                print!("> ");
+                io::stdout().flush()?;
             }
             PollAction::StdinReady => {
                 let mut input = String::new();
@@ -78,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 print!("Sending {input}");
 
-                let response = send_message(&mut frameforge_sock, &input)?;
+                let response = send_data(&mut frameforge_sock, input.as_bytes())?;
                 print!("Received: {response}");
 
                 print!("> ");
@@ -104,7 +116,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn open_veth_peer_socket(veth: &Veth) -> io::Result<OwnedFd> {
     use libc;
     use nix::net::if_;
-    use nix::sys::socket;
     use nix::sys::socket::SockaddrLike; // needed by from_raw
 
     let ifindex = if_::if_nametoindex(veth.peer())?;
@@ -165,9 +176,8 @@ fn poll_once(fds: &mut [PollFd]) -> PollAction {
     }
 }
 
-fn send_message(sock: &mut UnixStream, msg: &str) -> io::Result<String> {
+fn send_data(sock: &mut UnixStream, data: &[u8]) -> io::Result<String> {
     // Sending to server. The protocol is to send the data size then the data
-    let data = msg.as_bytes();
     let data_len = data.len() as u32;
 
     sock.write_all(&data_len.to_le_bytes())?;
