@@ -12,6 +12,13 @@ use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 //static VETHIP: &str = "192.168.35.1/24";
 static SERVERPATH: &str = "/tmp/frameforge.sock";
 
+enum PollAction {
+    ReachTimeout,
+    ReadStdin,
+    GotSignal,
+    Continue,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Check https://doc.rust-lang.org/stable/std/os/unix/net/struct.UnixStream.html#method.pair
     //
@@ -46,16 +53,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     while keep_looping.load(atomic::Ordering::SeqCst) {
         // Currently we just have stdin but we will add the Veth socket
+        // In the implementation of poll_actions we are expecting stdin in
+        // first place (and next Veth that is not yet available).
         let mut pollfds = [PollFd::new(stdin_fd, PollFlags::POLLIN)];
 
-        // Retry poll if interruped by signal EINTR. Without this we have:
-        //  | thread 'main' (60079) panicked at src/main.rs:41:68:
-        //  | called `Result::unwrap()` on an `Err` value: EINTR
-        //  | note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-        match poll(&mut pollfds, PollTimeout::from(100u16)) {
-            Ok(0) => continue,
-            Ok(_) => {} // nothing to do, fds are checked right after the match
-            Err(nix::errno::Errno::EINTR) => {
+        match poll_actions(&mut pollfds) {
+            PollAction::Continue | PollAction::ReachTimeout => continue,
+            PollAction::ReadStdin => {
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+
+                print!("Sending {input}");
+
+                let response = send_message(&mut frameforge_sock, &input)?;
+                print!("Received: {response}");
+
+                print!("> ");
+                io::stdout().flush()?;
+            }
+            PollAction::GotSignal => {
                 // poll() returns EINTR for any signal, not just SIGINT so we need to check
                 if keep_looping.load(atomic::Ordering::SeqCst) {
                     // It wasn't SIGINT (otherwise keep_looping is false) so keep looping
@@ -63,28 +79,33 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 break;
             }
-            Err(e) => panic!("poll failed: {}", e),
-        }
-
-        if pollfds[0]
-            .revents()
-            .is_some_and(|f| f.contains(PollFlags::POLLIN))
-        {
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-
-            print!("Sending {input}");
-
-            let response = send_message(&mut frameforge_sock, &input)?;
-            print!("Received: {response}");
-
-            print!("> ");
-            io::stdout().flush()?;
         }
     }
 
     println!("Bye!!!");
     Ok(())
+}
+
+fn poll_actions(mut fds: &mut [PollFd]) -> PollAction {
+    // Retry poll if interruped by signal EINTR. Without this we have:
+    //  | thread 'main' (60079) panicked at src/main.rs:41:68:
+    //  | called `Result::unwrap()` on an `Err` value: EINTR
+    //  | note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    match poll(&mut fds, PollTimeout::from(100u16)) {
+        Ok(0) => PollAction::ReachTimeout,
+        Ok(_) => {
+            if fds[0]
+                .revents()
+                .is_some_and(|f| f.contains(PollFlags::POLLIN))
+            {
+                PollAction::ReadStdin
+            } else {
+                PollAction::Continue
+            }
+        } // nothing to do, fds are checked right after the match
+        Err(nix::errno::Errno::EINTR) => PollAction::GotSignal,
+        Err(e) => panic!("poll failed: {}", e),
+    }
 }
 
 fn send_message(sock: &mut UnixStream, msg: &str) -> io::Result<String> {
