@@ -8,7 +8,7 @@ fn handleSigInt(sig_num: c_int) callconv(.c) void {
     quit_loop.store(true, .monotonic);
 }
 
-pub fn main() !void {
+pub fn main() void {
     const args = a.ReadArgs() orelse {
         std.debug.print("Usage: ethproxy <peer_iface> <socket>\n", .{});
         std.process.exit(1);
