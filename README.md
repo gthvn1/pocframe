@@ -15,6 +15,7 @@ Both are independent programs but live in the same project directory.
 
 - Rust + Cargo
 - OCaml + Dune
+- [Just](https://github.com/casey/just): in progress...
 
 Install them through your system package manager or toolchain.
 
