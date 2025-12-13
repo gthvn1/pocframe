@@ -9,11 +9,8 @@ use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use nix::sys::socket;
 use nix::sys::socket::MsgFlags;
 
-use ethproxy::setup::Veth;
-
 // TODO: pass this as parameters of client binary
-const VETH_NAME: &str = "veth0";
-const VETH_IP: &str = "192.168.35.1/24";
+const VETH_NAME: &str = "veth0-peer";
 const SERVER_PATH: &str = "/tmp/frameforge.sock";
 
 enum PollAction {
@@ -49,11 +46,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let binding = io::stdin();
     let stdin_fd = binding.as_fd();
 
-    // ----- Prepare the low level network: creation of Veth
-    let veth = Veth::init(VETH_NAME, VETH_IP);
-    veth.create_device();
-
-    let veth_fd = open_veth_peer_socket(&veth)?;
+    // ----- Bind to low level Veth socket
+    let veth_fd = open_veth_peer_socket(VETH_NAME)?;
 
     // ----- Connect to server: that will handle ethernet frame
     let mut frameforge_sock = UnixStream::connect(SERVER_PATH)?;
@@ -107,18 +101,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // ----- cleanup and quit
-    veth.destroy_device();
     println!("Bye!!!");
     Ok(())
 }
 
-fn open_veth_peer_socket(veth: &Veth) -> io::Result<OwnedFd> {
+fn open_veth_peer_socket(peer: &str) -> io::Result<OwnedFd> {
     use libc;
     use nix::net::if_;
     use nix::sys::socket::SockaddrLike; // needed by from_raw
 
-    let ifindex = if_::if_nametoindex(veth.peer())?;
+    let ifindex = if_::if_nametoindex(peer)?;
 
     let peer_fd = socket::socket(
         socket::AddressFamily::Packet,
