@@ -119,7 +119,7 @@ let handle (payload : bytes) : bytes =
   let () =
     match frame_parser payload 0 with
     | Error _e -> Printf.printf "Failed to parse frame header\n"
-    | Ok (h, _) ->
+    | Ok (h, _payload_off) ->
         let open Utils in
         let open String in
         let dst_str = hex_of_bytes h.dst_mac |> concat ":" in
