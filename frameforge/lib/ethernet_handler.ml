@@ -106,12 +106,13 @@ let handle (payload : bytes) : bytes =
     | Ok (h, _) ->
         let open Utils in
         let open String in
-        let dst_str = hex_of_bytes h.dst_mac |> concat " " in
-        let src_str = hex_of_bytes h.src_mac |> concat " " in
-        let etype_str = hex_of_bytes h.ethertype |> concat " " in
+        let dst_str = hex_of_bytes h.dst_mac |> concat ":" in
+        let src_str = hex_of_bytes h.src_mac |> concat ":" in
+        let etype_str = hex_of_bytes h.ethertype |> concat "" in
         Printf.printf "Destination MAC: %s\n" dst_str;
         Printf.printf "Source MAC     : %s\n" src_str;
-        Printf.printf "Ethernet type  : %s\n" etype_str
+        Printf.printf "Ethernet type  : %s\n" etype_str;
+        Printf.printf "-------------------------------------\n"
   in
   (* ----- Return a dummy message *)
   Bytes.of_string "TODO: parse ethernet frame\n"
