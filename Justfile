@@ -13,6 +13,12 @@ build-proxy:
     @echo 'Building proxy...'
     cargo build
 
+# Build Zig version of proxy
+[working-directory: 'ethproxy-zig']
+build-zig-proxy:
+    @echo 'Building Zig proxy'
+    zig build
+
 # Build the server
 [working-directory: 'frameforge']
 build-server:
@@ -35,6 +41,10 @@ proxy:
     # to ignore exit codes. Otherwise, Just reports an error when
     # ctrl-c is received.
     -sh -c 'exec ./ethproxy/target/debug/ethproxy {{peer_iface}} {{socket}}'
+
+# Start Zig proxy
+zig-proxy:
+    -sh -c 'exec ./ethproxy-zig/zig-out/bin/ethproxy_zig {{peer_iface}} {{socket}}'
 
 # Start server. Must be run in a shell started using setup-net
 server:
