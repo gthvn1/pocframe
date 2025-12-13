@@ -1,15 +1,14 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: $0 NET_IFACE CIDR" >&2
+if [ "$#" -ne 3 ]; then
+  echo "usage: $0 NET_IFACE PEER_IFACE CIDR" >&2
   exit 1
 fi
 
 NET_IFACE="$1"
-CIDR="$2"
-
-PEER_IFACE="${NET_IFACE}-peer"
+PEER_IFACE="$2"
+CIDR="$3"
 
 unshare -Urn sh -c "
   # Create veth pair if it doesn't exist
