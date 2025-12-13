@@ -2,9 +2,7 @@
 
 **R**ust handles low-level packet I/O, **OC**aml decodes **frame** and responds...
 
-## FrameForge + EthProxy
-
-This repository contains two components:
+This project contains two components:
 
 - **frameforge** — OCaml server (built with Dune)
 - **ethproxy** — Rust client (built with Cargo)
@@ -15,44 +13,86 @@ Both are independent programs but live in the same project directory.
 
 - Rust + Cargo
 - OCaml + Dune
-- [Just](https://github.com/casey/just): in progress...
+- [Just](https://github.com/casey/just)
+- ip command (from iproute2)
+- Linux environment with support for network namespaces (unshare)
 
-Install them through your system package manager or toolchain.
+Install them via your system package manager or preferred toolchain.
 
 ## Building
 
-From the repository root:
+From the repository root, using Just:
+- Build everything: `just build`
+- Build only the Rust client (ethproxy): `just build-proxy`
+- Build only the OCaml server (frameforge: `just build-server`
 
-- Build everything: `make`
-- Build only the Rust client: `make ethproxy`
-- Build only the OCaml server: `make frameforge`
-
-## Running
-
-The server and client run separately.
-
-### Run the server
-```sh
-make run-server
-```
-- The server listens on: `/tmp/frameforge.sock`
-- Press Ctrl-C to stop it cleanly.
-
-### Run the client
-```sh
-make run-proxy
-```
-- This starts the Rust client that will setup the network and sends ethernet frame
-  to server.
-- Press Ctrl-C to stop it cleanly.
+The Justfile uses directory switching internally to build in the correct directories.
 
 ## Cleaning
 
-### Clean both builds
+From the repository root: `just clean`
+
+## Setting up the network
+
+The project uses a veth pair inside a network namespace for testing.
+Use the **setup-net** recipe to create the namespace and start an interactive shell inside it: `just setup-net`
+
+- This will create a veth pair:
+  - net interface (default: veth0)
+  - peer interface (default: veth0-peer)
+- Assigns a CIDR address to the interface (default: 192.168.35.2/24)
+- Cleans up automatically when the shell exits
+- Use a terminal multiplexer (tmux, screen, etc.) for running multiple commands inside the namespace
+
+All commands run inside this shell inherit the network namespace.
+
+## Running
+
+After `just setup-net`, you can start the server and proxy in separate terminal panes or shells.
+
+- Start the server: `just server`
+  - The OCaml server listens on a Unix socket (default: /tmp/frameforge.sock)
+  - Receives Ethernet frames and responds
+  - Press Ctrl-C to stop it cleanly
+
+- Start the proxy: `just proxy`
+  - The Rust client connects to the veth interface and sends Ethernet frames to the server
+  - Also listens for user input
+  - Press Ctrl-C to stop it cleanly
+
+Ensure the proxy and server are run inside the namespace shell created by `setup-net`.
+
+## Justfile Recipes Summary
 
 ```sh
-make clean
+$ just
+default       # List all available recipes (just --list)
+build         # Build both server and proxy
+build-proxy   # Build only the Rust proxy
+build-server  # Build only the OCaml server
+clean         # Clean the build of proxy and server
+setup-net     # Set up veth pair and start a shell in the network namespace
+proxy         # Start the Rust proxy inside the namespace
+server        # Start the OCaml server inside the namespace
 ```
+
+The server and client run separately.
+
+## Notes
+
+- All network testing happens inside the namespace; no root privileges are required outside the namespace creation.
+- You can change the interface names, CIDR, or socket by editing the Justfile variables:
+
+```
+net_iface := "veth0"
+peer_iface := net_iface + "-peer"
+cidr := "192.168.35.2/24"
+socket := "/tmp/rocframe.sock"
+```
+
+- Use a terminal multiplexer to run server and proxy simultaneously for testing.
+
+---
 
 ## Screenshot
 

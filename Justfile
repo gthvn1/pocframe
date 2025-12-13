@@ -12,17 +12,22 @@ default:
 build-proxy:
     @echo 'Building proxy...'
     cargo build
-    @echo 'done'
 
 # Build the server
 [working-directory: 'frameforge']
 build-server:
     @echo 'Building server...'
     dune build
-    @echo 'done'
 
 # Build the proxy and the server
 build: build-proxy build-server
+
+# Clean the build of proxy and server
+clean:
+    @echo 'Cleaning proxy'
+    cd ethproxy && cargo clean
+    @echo 'Cleaning server'
+    cd frameforge && dune clean
 
 # Set up Veth pair and start a shell.
 setup-net:
