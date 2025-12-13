@@ -40,12 +40,12 @@ pub fn main() void {
         std.debug.print("You write <{s}>\n", .{r});
         // Should we continue
         if (quit_loop.load(.monotonic)) {
-            std.debug.print("bye", .{});
+            std.debug.print("bye\n", .{});
             break;
         }
         std.debug.print("> ", .{});
     } else |_| {
-        std.debug.print("end", .{});
+        std.debug.print("end\n", .{});
         std.process.exit(1);
     }
 }
