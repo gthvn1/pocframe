@@ -5,3 +5,5 @@ SOCKET := "/tmp/rocframe.sock"
 setup-net:
     ./scripts/netns.sh {{NET_IFACE}} {{CIDR}}
 
+server:
+    ./frameforge/_build/default/bin/main.exe

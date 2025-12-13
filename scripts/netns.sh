@@ -10,12 +10,8 @@ NET_IFACE="$1"
 CIDR="$2"
 
 PEER_IFACE="${NET_IFACE}-peer"
-PID_FILENAME="/tmp/rocframe-ns.pid"
-rm -f "${PID_FILENAME}"
 
 unshare -Urn sh -c "
-  echo \$\$ > ${PID_FILENAME}
-
   # Create veth pair if it doesn't exist
   ip link add ${NET_IFACE} type veth peer name ${PEER_IFACE} 2>/dev/null || true
 
@@ -26,8 +22,6 @@ unshare -Urn sh -c "
   # Assign IP to main interface (peer IP will be managed by server)
   ip addr add ${CIDR} dev ${NET_IFACE}
 
-  # run interactive shell; remove PID on exit
+  # Start a shell from where you will be able to run zellij, tmux or any mux
   sh
-
-  rm -f "${PID_FILENAME}"
 "
