@@ -1,9 +1,24 @@
-type ethernet_header = { dst_mac : bytes; src_mac : bytes; ethertype : bytes }
+(* https://en.wikipedia.org/wiki/Ethernet_frame *)
+
+type ethernet_header = {
+  dst_mac : bytes;
+  src_mac : bytes;
+  ethertype : Ethertype.t;
+}
 
 type 'a parser = bytes -> int -> ('a * int, string) result
 (** It represents the parser. It takes a full input buffer [bytes], the current
     offset [int] in the buffer and returns a tuple with the value read and the
     new offset, or an error string in case of failure .*)
+
+(** [comp p f] returns a function that call the parser [p] and if the result is
+    ok it applies [f]. Otherwise it returns the error. *)
+let comp (p : 'a parser) (f : 'a -> 'b parser) : 'b parser =
+ fun buf pos ->
+  match p buf pos with Error e -> Error e | Ok (v, pos') -> f v buf pos'
+
+(** Use to chain comp operation *)
+let ( >=> ) = comp
 
 let mac_parser : bytes parser =
  fun buf pos ->
@@ -12,20 +27,22 @@ let mac_parser : bytes parser =
     let m = Bytes.sub buf pos 6 in
     Ok (m, pos + 6)
 
-let ethertype_parser : bytes parser =
+let u16_be_parser : int parser =
  fun buf pos ->
   if pos + 2 > Bytes.length buf then Error "unexpected end of input"
   else
-    let m = Bytes.sub buf pos 2 in
-    Ok (m, pos + 2)
+    let v = (Bytes.get_uint8 buf pos lsl 8) lor Bytes.get_uint8 buf (pos + 1) in
+    Ok (v, pos + 2)
 
-(** [comp p f] returns a function that call the parser [p] and if the result is
-    ok it applies [f]. Otherwise it returns the error. *)
-let comp (p : 'a parser) (f : 'a -> 'b parser) : 'b parser =
- fun buf pos ->
-  match p buf pos with Error e -> Error e | Ok (v, pos') -> f v buf pos'
+let ethertype_parser : Ethertype.t parser =
+  u16_be_parser >=> fun etype ->
+  match etype with
+  | 0x0800 -> fun _buf pos -> Ok (Ethertype.Ether_ipv4, pos)
+  | 0x0806 -> fun _buf pos -> Ok (Ethertype.Ether_arp, pos)
+  | 0x86DD -> fun _buf pos -> Ok (Ethertype.Ether_ipv6, pos)
+  | x -> fun _buf pos -> Ok (Ethertype.Ether_unknown x, pos)
 
-(** [parse_frame buf pos] parse the destination mac, the src mac and the
+(** [frame_parser buf pos] parse the destination mac, the src mac and the
     ethertype. We are using the comp function we can create a parser for
     ethernet.
 
@@ -33,7 +50,7 @@ let comp (p : 'a parser) (f : 'a -> 'b parser) : 'b parser =
     {|
       -> mac_parser parses 6 bytes and returns (mac, new_pos)
       -> ethertype_parser parses 2 bytes and returns (ethertype, new_pos)
-      1. Call to `parse_frame payload 0` is expanded as:
+      1. Call to `frame_parser payload 0` is expanded as:
            comp mac_parser (fun dst ->
                comp mac_parser (fun src ->
                    comp ethertype_parser (fun etype ->
@@ -72,12 +89,11 @@ let comp (p : 'a parser) (f : 'a -> 'b parser) : 'b parser =
             Ok ({ dst_mac = dst; src_mac = src; ethertype = etype }, pos3))))
     |}
     *)
-let parse_frame : ethernet_header parser =
-  comp mac_parser (fun dst ->
-      comp mac_parser (fun src ->
-          comp ethertype_parser (fun etype ->
-              fun _buf pos ->
-               Ok ({ dst_mac = dst; src_mac = src; ethertype = etype }, pos))))
+let frame_parser : ethernet_header parser =
+  mac_parser >=> fun dst ->
+  mac_parser >=> fun src ->
+  ethertype_parser >=> fun etype ->
+  fun _buf pos -> Ok ({ dst_mac = dst; src_mac = src; ethertype = etype }, pos)
 
 (** [handle payload] is the entry point of the Ethernet handler. It takes the
     [payload] and parse it to produce a result. Currently it is a work in
@@ -101,17 +117,16 @@ let handle (payload : bytes) : bytes =
 
   (* ----- Parsing *)
   let () =
-    match parse_frame payload 0 with
+    match frame_parser payload 0 with
     | Error _e -> Printf.printf "Failed to parse frame header\n"
     | Ok (h, _) ->
         let open Utils in
         let open String in
         let dst_str = hex_of_bytes h.dst_mac |> concat ":" in
         let src_str = hex_of_bytes h.src_mac |> concat ":" in
-        let etype_str = hex_of_bytes h.ethertype |> concat "" in
         Printf.printf "Destination MAC: %s\n" dst_str;
         Printf.printf "Source MAC     : %s\n" src_str;
-        Printf.printf "Ethernet type  : %s\n" etype_str;
+        Printf.printf "Ethernet type  : %s\n" (Ethertype.to_string h.ethertype);
         Printf.printf "-------------------------------------\n"
   in
   (* ----- Return a dummy message *)
