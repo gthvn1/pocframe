@@ -41,14 +41,14 @@ server:
     -sh -c 'exec ./frameforge/_build/default/bin/main.exe `ip -j a` {{socket}}'
 
 # Set up Veth pair and start a shell.
-netns-shell:
+netns-shell: build
     @echo 'Setting network using {{net_iface}} {{peer_iface}} {{cidr}}'
     @echo 'Use a terminal mux to run proxy and server in this env'
     cd scripts && ./netns_shell.sh {{net_iface}} {{peer_iface}} {{cidr}}
     @echo 'Cleanup env'
 
 # Run the whole workflow in tmux
-netns-tmux:
+netns-tmux: build
     @echo 'Starting tmux session inside network namespace...'
     cd scripts && ./netns_tmux.sh {{net_iface}} {{peer_iface}} {{cidr}} {{socket}}
     @echo 'Cleanup env'
