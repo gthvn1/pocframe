@@ -102,7 +102,7 @@ let handle (payload : bytes) : bytes =
   (* ----- Parsing *)
   let () =
     match parse_frame payload 0 with
-    | Error _e -> Printf.printf "Failed to parse frame header"
+    | Error _e -> Printf.printf "Failed to parse frame header\n"
     | Ok (h, _) ->
         let open Utils in
         let open String in
