@@ -1,17 +1,15 @@
+use std::env;
 use std::error::Error;
 use std::io::{self, Read, Write};
 use std::os::fd::{AsFd, AsRawFd, OwnedFd};
 use std::os::unix::net::UnixStream;
+use std::process::exit;
 use std::sync::{Arc, atomic};
 
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
 use nix::sys::socket;
 use nix::sys::socket::MsgFlags;
-
-// TODO: pass this as parameters of client binary
-const VETH_NAME: &str = "veth0-peer";
-const SERVER_PATH: &str = "/tmp/frameforge.sock";
 
 enum PollAction {
     TimedOut,
@@ -22,6 +20,16 @@ enum PollAction {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // We are expecting veth-name and then server socket
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        eprintln!("Usage: proxy <veth-name> <server-socket>");
+        exit(1);
+    }
+
+    let veth_name: &str = &args[1];
+    let server_sock: &str = &args[2];
+
     // ----- Prepare the loop: we want to allow quitting loop using Ctrl-C
     let keep_looping = Arc::new(atomic::AtomicBool::new(true));
 
@@ -47,10 +55,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stdin_fd = binding.as_fd();
 
     // ----- Bind to low level Veth socket
-    let veth_fd = open_veth_peer_socket(VETH_NAME)?;
+    let veth_fd = open_veth_peer_socket(veth_name)?;
 
     // ----- Connect to server: that will handle ethernet frame
-    let mut frameforge_sock = UnixStream::connect(SERVER_PATH)?;
+    let mut frameforge_fd = UnixStream::connect(server_sock)?;
 
     // ----- Ready to enter infinite client loop
     println!("Ctrl-C to quit");
@@ -72,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut buf = vec![0u8; 2048]; // enough room for ethernet frame
                 let n = socket::recv(veth_fd.as_raw_fd(), &mut buf, MsgFlags::empty())?;
 
-                let response = send_data(&mut frameforge_sock, &buf[0..n])?;
+                let response = send_data(&mut frameforge_fd, &buf[0..n])?;
                 print!("Received: {response}");
 
                 print!("> ");
@@ -84,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 print!("Sending {input}");
 
-                let response = send_data(&mut frameforge_sock, input.as_bytes())?;
+                let response = send_data(&mut frameforge_fd, input.as_bytes())?;
                 print!("Received: {response}");
 
                 print!("> ");
