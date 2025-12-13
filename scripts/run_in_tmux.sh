@@ -21,17 +21,15 @@ unshare -Urn sh -c "
   
   # Start tmux session
   tmux new-session -d -s rocframe-session
-  tmux rename-window -t rocframe-session:0 'Main'
   tmux split-window -h -t rocframe-session:0
   
   # Start server in right pane
-  tmux send-keys -t rocframe-session:0.1 'just server' C-m
+  tmux select-pane -R
+  tmux send-keys 'just server' C-m
   
   # Start proxy in left pane after waiting for socket
-  tmux send-keys -t rocframe-session:0.0 'while [ ! -S ${SOCKET} ]; do sleep 0.1; done; just proxy' C-m
-
-  # Focus proxy (left pane)
-  tmux select-pane -t rocframe-session:0.0
+  tmux select-pane -L
+  tmux send-keys 'while [ ! -S ${SOCKET} ]; do sleep 0.1; done; just proxy' C-m
     
   # Attach to session
   tmux attach -t rocframe-session
