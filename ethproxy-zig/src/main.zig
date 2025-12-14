@@ -58,14 +58,14 @@ pub fn main() !void {
             .stdin_ready => {
                 if (stdin.takeDelimiterExclusive('\n')) |r| {
                     // need to toss the delimiter explicitly since we're not
-                    // reading it
+                    // reading it. Otherwise we will loop forever
                     stdin.toss(1);
 
-                    // Send it to server and print its answer
+                    // Send it to server and print its response
                     try server.send(r);
-                    const answer = try server.read(allocator);
-                    defer allocator.free(answer);
-                    std.debug.print("Answer: {s}\n", .{answer});
+                    const response = try server.read(allocator);
+                    defer allocator.free(response);
+                    std.debug.print("Response: {s}\n", .{response});
 
                     // Print a new prompt
                     std.debug.print("> ", .{});
