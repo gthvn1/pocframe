@@ -3,6 +3,7 @@ const posix = std.posix;
 
 const a = @import("args.zig");
 const FrameForge = @import("frameforge.zig").FrameForge;
+const Veth = @import("veth.zig").Veth;
 
 var keep_looping = std.atomic.Value(bool).init(true);
 
@@ -38,11 +39,19 @@ pub fn main() !void {
     };
     posix.sigaction(posix.SIG.INT, &action, null);
 
+    // Connect to the frameforge server
     var server = FrameForge.init(args.socket) catch |e| {
         std.debug.print("Failed to create socket: {s}\n", .{@errorName(e)});
         std.process.exit(1);
     };
     defer server.deinit();
+
+    // Connect to the Veth socket
+    var veth = Veth.init(args.peer_iface) catch |e| {
+        std.debug.print("Failed to connect to Veth {s}: {s}", .{ args.peer_iface, @errorName(e) });
+        std.process.exit(1);
+    };
+    defer veth.deinit();
 
     // Manage user input
     var buffer: [1024]u8 = undefined;
