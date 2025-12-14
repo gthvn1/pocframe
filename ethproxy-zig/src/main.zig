@@ -17,7 +17,11 @@ const PollAction = enum {
     stdin_ready,
 };
 
-pub fn main() void {
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.debug.assert(gpa.deinit() == std.heap.Check.ok);
+    const allocator = gpa.allocator();
+
     const args = a.ReadArgs() orelse {
         std.debug.print("Usage: ethproxy <peer_iface> <socket>\n", .{});
         std.process.exit(1);
@@ -34,7 +38,7 @@ pub fn main() void {
     };
     posix.sigaction(posix.SIG.INT, &action, null);
 
-    const server = FrameForge.init(args.socket) catch |e| {
+    var server = FrameForge.init(args.socket) catch |e| {
         std.debug.print("Failed to create socket: {s}\n", .{@errorName(e)});
         std.process.exit(1);
     };
@@ -56,7 +60,14 @@ pub fn main() void {
                     // need to toss the delimiter explicitly since we're not
                     // reading it
                     stdin.toss(1);
-                    std.debug.print("You write <{s}>\n", .{r});
+
+                    // Send it to server and print its answer
+                    try server.send(r);
+                    const answer = try server.read(allocator);
+                    defer allocator.free(answer);
+                    std.debug.print("Answer: {s}\n", .{answer});
+
+                    // Print a new prompt
                     std.debug.print("> ", .{});
                 } else |_| {
                     std.debug.print("end\n", .{});
