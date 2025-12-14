@@ -16,6 +16,7 @@ const PollAction = enum {
     timeout_reached,
     unknown,
     stdin_ready,
+    veth_ready,
 };
 
 pub fn main() !void {
@@ -62,7 +63,7 @@ pub fn main() !void {
     std.debug.print("> ", .{});
 
     while (keep_looping.load(.monotonic)) {
-        switch (wait(posix.STDIN_FILENO)) {
+        switch (wait(posix.STDIN_FILENO, veth.fd)) {
             .timeout_reached => continue,
             .stdin_ready => {
                 if (stdin.takeDelimiterExclusive('\n')) |r| {
@@ -83,9 +84,11 @@ pub fn main() !void {
                     std.process.exit(1);
                 }
             },
+            .veth_ready => {
+                std.debug.print("You've got a frame on VETH\n", .{});
+            },
             .unknown => {
                 std.debug.print("What happens?\n", .{});
-                continue;
             },
         }
     }
@@ -93,14 +96,16 @@ pub fn main() !void {
     std.debug.print("bye\n", .{});
 }
 
-fn wait(stdin: std.posix.fd_t) PollAction {
+fn wait(stdin: posix.fd_t, veth_fd: posix.fd_t) PollAction {
     var fds = [_]posix.pollfd{
         .{ .fd = stdin, .events = posix.POLL.IN, .revents = 0 },
+        .{ .fd = veth_fd, .events = posix.POLL.IN, .revents = 0 },
     };
 
     // Wait 100ms
     const n = posix.poll(&fds, 100) catch unreachable;
     if (n == 0) return .timeout_reached;
     if ((fds[0].revents & posix.POLL.IN) != 0) return .stdin_ready;
+    if ((fds[1].revents & posix.POLL.IN) != 0) return .veth_ready;
     return .unknown;
 }
