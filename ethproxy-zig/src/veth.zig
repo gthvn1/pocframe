@@ -10,19 +10,24 @@ pub const Veth = struct {
 
     pub fn init(name: [:0]const u8) !Veth {
         // man 7 packet
-        const veth_fd = try posix.socket(posix.AF.PACKET, posix.SOCK.STREAM, 0);
+        const veth_fd = try posix.socket(posix.AF.PACKET, posix.SOCK.RAW, 0);
+
+        const idx = std.c.if_nametoindex(name);
+        if (idx == 0) return error.InterfaceNotFound;
+
+        std.debug.print("{s} interface = {d}\n", .{ name, idx });
 
         const veth_addr = posix.sockaddr.ll{
             .family = posix.AF.PACKET,
             .protocol = std.os.linux.ETH.P.ALL,
-            .ifindex = std.c.if_nametoindex(name),
+            .ifindex = idx,
             .hatype = 0,
-            .pkttype = 0,
+            .pkttype = std.os.linux.PACKET.BROADCAST, // TODO: check if 0 is ok
             .halen = 0,
             .addr = [_]u8{0} ** 8,
         };
 
-        try posix.connect(veth_fd, @ptrCast(&veth_addr), @sizeOf(posix.sockaddr.ll));
+        try posix.bind(veth_fd, @ptrCast(&veth_addr), @sizeOf(posix.sockaddr.ll));
 
         return .{
             .fd = veth_fd,
