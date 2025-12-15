@@ -118,4 +118,4 @@ socat -v UNIX-LISTEN:/tmp/frameforge-proxy.sock,fork \
 
 ## Screenshot
 
-<img src="https://github.com/gthvn1/rocframe/blob/master/screenshot.png">
+<img src="https://github.com/gthvn1/pocframe/blob/master/screenshot.png">
