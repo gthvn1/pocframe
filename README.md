@@ -6,11 +6,14 @@ This project contains three components:
 
 - **network script** - Shell script to create Veth pair and setup IP (Posix Shell)
 - **frameforge** - OCaml server to decode frame and protocol logic (built with Dune)
-- **ethproxy** - Rust proxy to forward data to server (built with Cargo), a Zig replacement is in progress...
+- **ethproxy** - Rust or Zig proxy to forward data to server
+
+We used Rust and Zig to compare how it feels to program in these two languages. We initially
+planned to use C for packet handling, but we wanted to try some newer, cooler languages.
 
 ## Requirements
 
-- Rust + Cargo
+- Rust + Cargo and/or Zig 0.15
 - OCaml + Dune
 - [Just](https://github.com/casey/just)
 - ip command (from iproute2)
@@ -22,7 +25,8 @@ Install them via your system package manager or preferred toolchain.
 
 From the repository root, using Just:
 - Build everything: `just build`
-- Build only the Rust client (ethproxy): `just build-proxy`
+- Build only the Rust client (ethproxy): `just build-rust-proxy`
+- Build only the Zig client (ethproxy): `just build-zig-proxy`
 - Build only the OCaml server (frameforge): `just build-server`
 
 The Justfile uses directory switching internally to build in the correct directories.
@@ -54,8 +58,8 @@ After `just netns-shell`, you can start the server and proxy in separate termina
   - Receives Ethernet frames and responds
   - Press Ctrl-C to stop it cleanly
 
-- Start the proxy: `just proxy`
-  - The Rust client connects to the veth interface and sends Ethernet frames to the server
+- Start the proxy: `just rust-proxy` or `just zig-proxy`, both are working.
+  - The client connects to the veth interface and sends Ethernet frames to the server
   - Also listens for user input
   - Press Ctrl-C to stop it cleanly
 
@@ -66,17 +70,19 @@ You can also, it you have **tmux** run everything with one command: `just netns-
 ## Justfile Recipes Summary
 
 ```sh
-❯ just -l
+❯ just
 Available recipes:
-    build        # Build the proxy and the server
-    build-proxy  # Build the proxy
-    build-server # Build the server
-    clean        # Clean the build of proxy and server
-    default      # List recipes
-    netns-shell  # Set up Veth pair and start a shell.
-    netns-tmux   # Run the whole workflow in tmux
-    proxy        # Start the proxy. Must be run in a shell started with setup-net
-    server       # Start server. Must be run in a shell started using setup-net
+    build            # Build the proxy and the server
+    build-rust-proxy # Build the rust proxy
+    build-server     # Build the server
+    build-zig-proxy  # Build Zig version of proxy
+    clean            # Clean the build of proxy and server
+    default          # List recipes
+    netns-shell      # Set up Veth pair and start a shell.
+    netns-tmux       # Run the whole workflow in tmux
+    rust-proxy       # Start the proxy. Must be run in a shell started with setup-net
+    server           # Start server. Must be run in a shell started using setup-net
+    zig-proxy        # Start Zig proxy
 ```
 
 The server and client run separately.
