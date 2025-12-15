@@ -90,6 +90,12 @@ pub fn main() !void {
                     continue;
                 };
                 std.debug.print("Got frame: {d} bytes\n", .{n});
+
+                // Send it to server and print its response
+                try server.send(buf[0..n]);
+                const response = try server.read(allocator);
+                defer allocator.free(response);
+                std.debug.print("Response: {s}\n", .{response});
             },
             .unknown => {
                 std.debug.print("What happens?\n", .{});
