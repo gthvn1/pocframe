@@ -50,7 +50,7 @@ zig-proxy:
 
 # Start server. Must be run in a shell started using setup-net
 server:
-    -sh -c 'exec ./frameforge/_build/default/bin/main.exe `ip -j a` {{socket}}'
+    -sh -c 'exec ./frameforge/_build/default/bin/main.exe `ip -j a` {{peer_iface}} {{socket}}'
 
 # Set up Veth pair and start a shell.
 netns-shell: build
