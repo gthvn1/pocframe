@@ -14,7 +14,7 @@ let found_iface name ifaces : t option =
   in
   aux ifaces
 
-let get (name : string) (json_str : string) : t option =
+let get ~(name : string) (json_str : string) : t option =
   let json = Yojson.Safe.from_string json_str in
   (* Format.printf "Parsed to %a\n" Yojson.Safe.pp json; *)
   match json with
