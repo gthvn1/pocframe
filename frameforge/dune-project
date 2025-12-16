@@ -19,7 +19,10 @@
  (name frameforge)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml yojson)
+ (depends
+  ocaml
+  yojson
+  (alcotest :with-test))
  (tags
   ("add topics" "to describe" your project)))
 
