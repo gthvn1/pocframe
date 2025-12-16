@@ -11,24 +11,20 @@ let ip_json_str =
 let interface =
   Alcotest.testable
     (Fmt.record
-       [
-         Fmt.field "mac"
-           (fun (i : Frameforge.Iface_parser.interface) -> i.mac)
-           Fmt.string;
-       ])
+       [ Fmt.field "mac" (fun (i : Frameforge.Iface.t) -> i.mac) Fmt.string ])
     ( = )
 
 let interface_opt = Alcotest.option interface
 
 let test_find_mac () =
-  let iface = Frameforge.Iface_parser.get_iface "veth0-peer" ip_json_str in
-  let expected : Frameforge.Iface_parser.interface option =
+  let iface = Frameforge.Iface.get "veth0-peer" ip_json_str in
+  let expected : Frameforge.Iface.t option =
     Some { mac = "3a:b4:51:1e:6b:79" }
   in
   Alcotest.(check interface_opt) "mac address found" expected iface
 
 let test_unknown_dev () =
-  let iface = Frameforge.Iface_parser.get_iface "veth0-unkown" ip_json_str in
+  let iface = Frameforge.Iface.get "veth0-unkown" ip_json_str in
   Alcotest.(check interface_opt) "device not found" None iface
 
 let () =

@@ -1,7 +1,7 @@
 (* Currently we just need the mac address but it can evolve *)
-type interface = { mac : string }
+type t = { mac : string }
 
-let found_iface name ifaces : interface option =
+let found_iface name ifaces : t option =
   let rec aux = function
     | [] -> None
     | iface :: rest ->
@@ -14,7 +14,7 @@ let found_iface name ifaces : interface option =
   in
   aux ifaces
 
-let get_iface (name : string) (json_str : string) : interface option =
+let get (name : string) (json_str : string) : t option =
   let json = Yojson.Safe.from_string json_str in
   (* Format.printf "Parsed to %a\n" Yojson.Safe.pp json; *)
   match json with
