@@ -5,4 +5,7 @@ let ip_json_str =
 
 let () =
   let json = Yojson.Safe.from_string ip_json_str in
-  Format.printf "Parsed to %a" Yojson.Safe.pp json
+  Format.printf "Parsed to %a\n" Yojson.Safe.pp json;
+  match json with
+  | `List _ -> Printf.printf "Found a list entry"
+  | _ -> Printf.printf "Found something else"
