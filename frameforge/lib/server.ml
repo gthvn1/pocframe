@@ -1,5 +1,3 @@
-type handler = Bytes.t -> Bytes.t
-
 let decode_header bytes : int =
   (* The first 4 bytes are the lenght *)
   let open Bytes in
@@ -27,7 +25,7 @@ let rec read_exact fd buf offset len =
     | n -> read_exact fd buf (offset + n) (len - n)
 
 (** handle one client connection *)
-let handle_client fd handler =
+let handle_client fd =
   let rec aux () =
     (* --- Read the first 4 bytes first to get the size *)
     let header = Bytes.create 4 in
@@ -45,7 +43,7 @@ let handle_client fd handler =
             ()
         | _ ->
             (* --- Call the handler *)
-            let response = handler payload in
+            let response = Ethernet_handler.handle payload in
             (* --- Send response *)
             let response_size = Bytes.length response in
             let header = encode_header response_size in
@@ -56,7 +54,7 @@ let handle_client fd handler =
   in
   aux ()
 
-let run socket_path (handler : handler) =
+let run socket_path =
   (* Add the signal handler to cleanly shutdown the server *)
   Sys.(set_signal sigint (Signal_handle (fun _ -> ())));
   let open Unix in
@@ -72,7 +70,7 @@ let run socket_path (handler : handler) =
     try
       let fd, _ = accept sock in
       Printf.printf "FRAMEFORGE: Client connected\n%!";
-      handle_client fd handler;
+      handle_client fd;
       close fd;
       Printf.printf "FRAMEFORGE: client disconnected\n%!";
       accept_loop ()
